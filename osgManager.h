@@ -31,6 +31,8 @@ public:
 	void switchScene();
 
 	void run();
+	void getPosition();
+	void test();
 
 	void getPoints(const sensor_msgs::PointCloud2::ConstPtr& msg_in);
 private:

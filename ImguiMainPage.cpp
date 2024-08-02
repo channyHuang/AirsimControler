@@ -1,6 +1,7 @@
 #include "ImguiMainPage.h"
 
 #include "osgManager.h"
+#include <thread>
 GLuint textureID;
 
 ImguiMainPage::ImguiMainPage() {
@@ -35,9 +36,15 @@ void ImguiMainPage::drawUi() {
         if (ImGui::BeginTabItem("Drone"))
         {
             if (ImGui::Button("move")) {
-                OsgManager::getInstance()->run();
+                std::thread runThread([]() { OsgManager::getInstance()->run(); });
+                runThread.detach();
             }
-
+            if (ImGui::Button("get position")) {
+                OsgManager::getInstance()->getPosition();
+            }
+            if (ImGui::Button("test")) {
+                OsgManager::getInstance()->test();
+            }
             ImGui::EndTabItem();
         }
 

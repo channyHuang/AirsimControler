@@ -32,6 +32,8 @@ public:
 	SignalSlot::Signal<void(const sensor_msgs::PointCloud2::ConstPtr& msg_in)> notifyPoints;
 
 	void run();
+	void getPosition();
+	void test();
 
 	void getImuData();
 	void getImageData(const std::string& camera_name = "front_center", const std::string& vehicle_name = "UAV201");
@@ -39,5 +41,5 @@ public:
 private:
 	static std::shared_ptr<AirSimManager> instance;
 
-	msr::airlib::MultirotorRpcLibClient client;
+	msr::airlib::MultirotorRpcLibClient client;	
 };

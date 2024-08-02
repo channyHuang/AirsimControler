@@ -104,6 +104,13 @@ void OsgManager::run() {
 	std::thread thread([]() {
 		AirSimManager::getInstance()->run();
 		});
-	thread.detach();
+thread.detach();
 }
 
+void OsgManager::getPosition() {
+	// AirSimManager::getInstance()->getPosition();
+}
+
+void OsgManager::test() {
+	// AirSimManager::getInstance()->test();
+}
