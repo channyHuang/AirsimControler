@@ -10,21 +10,28 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-std::shared_ptr<AirSimManager> AirSimManager::instance = nullptr;
+std::shared_ptr<AirSimManager> AirSimManager::m_pInstance = nullptr;
 
 void AirSimManager::getImuData() {
     auto imu_data = client.getImuData();
 
     sensor_msgs::Imu::ConstPtr msg = std::make_shared<sensor_msgs::Imu::StImu>();
-    msg->header.stamp.stamp = imu_data.time_stamp;
+    msg->header.stamp.sec = imu_data.time_stamp / 1000000000;
+    msg->header.stamp.nsec = imu_data.time_stamp % 1000000000;
     msg->angular_velocity.x() = imu_data.angular_velocity[0];
     msg->angular_velocity.y() = imu_data.angular_velocity[1];
     msg->angular_velocity.z() = imu_data.angular_velocity[2];
     msg->linear_acceleration.x() = imu_data.linear_acceleration[0];
     msg->linear_acceleration.y() = imu_data.linear_acceleration[1];
     msg->linear_acceleration.z() = imu_data.linear_acceleration[2];
-    ////std::cout << msg->header.stamp.toSec() << " " << msg->angular_velocity.x() << " " << msg->angular_velocity.y() << " " << msg->angular_velocity.z() << " " << msg->linear_acceleration.x() << " " << msg->linear_acceleration.y() << " " << msg->linear_acceleration.z() << std::endl;
+
     notifyImu(msg);
+
+    // char name[10] = {0};
+    // sprintf(name, "%llu.%09llu.imu", msg->header.stamp.sec, msg->header.stamp.nsec);
+    // std::ofstream ofs(name, std::ios_base::app);
+    // ofs << msg->header.stamp.toSec() << " " << msg->angular_velocity.x() << " " << msg->angular_velocity.y() << " " << msg->angular_velocity.z() << " " << msg->linear_acceleration.x() << " " << msg->linear_acceleration.y() << " " << msg->linear_acceleration.z() << std::endl;
+    // ofs.close();
 }
 
 void AirSimManager::getImageData(const std::string &camera_name, const std::string& vehicle_name) {
@@ -37,15 +44,21 @@ void AirSimManager::getImageData(const std::string &camera_name, const std::stri
     const std::vector<ImageResponse>& response = client.simGetImages(request, vehicle_name);
     if (response.size()) {
         for (const ImageResponse& image_info : response) {
-            cv::Mat img(image_info.height, image_info.width, CV_8UC4);
-            cv::imdecode(image_info.image_data_uint8, cv::IMREAD_COLOR, &img);
+            // cv::Mat img(image_info.height, image_info.width, CV_8UC4);
+            // cv::imdecode(image_info.image_data_uint8, cv::IMREAD_COLOR, &img);
             //cv::imshow("image", img);
             //cv::waitKey(1);
 
             sensor_msgs::ImageConstPtr msg = std::make_shared<sensor_msgs::Image::StImage>();
-            msg->header.stamp.sec = image_info.time_stamp;
+            msg->header.stamp.sec = image_info.time_stamp / 1000000000;
+            msg->header.stamp.nsec = image_info.time_stamp % 1000000000;
             msg->imageView = cv::imdecode(image_info.image_data_uint8, cv::IMREAD_COLOR);
+            
             notifyImage(msg);
+
+            // char name[10] = {0};
+            // sprintf(name, "%llu.%09llu.jpg", msg->header.stamp.sec, msg->header.stamp.nsec);
+            // cv::imwrite(name, img);
         }
     }
 }
@@ -54,13 +67,25 @@ void AirSimManager::getLidarData(const std::string& lidar_name, const std::strin
     msr::airlib::LidarData lidarData = client.getLidarData(lidar_name, vehicle_name);
 
     sensor_msgs::PointCloud2::Ptr msg = std::make_shared<sensor_msgs::PointCloud2::StPointCloud>();
+    msg->header.stamp.sec = lidarData.time_stamp / 1000000000;
+    msg->header.stamp.nsec = lidarData.time_stamp % 1000000000;
+
     int len = lidarData.point_cloud.size();
     
     for (int i = 0; i < len; i += 3) {
        //pcl::PointXYZINormal pt(lidarData.point_cloud[i], lidarData.point_cloud[i + 1], lidarData.point_cloud[i + 2]);
        msg->pcl_pc.push_back({ lidarData.point_cloud[i], lidarData.point_cloud[i + 1], lidarData.point_cloud[i + 2] });
     }
+
     notifyPoints(msg);
+
+    // char name[10] = {0};
+    // sprintf(name, "%llu.%09llu.xyz", msg->header.stamp.sec, msg->header.stamp.nsec);
+    // std::ofstream ofs(name);
+    // for (int i = 0; i < len; i += 3) {
+    //     ofs << lidarData.point_cloud[i] << " " << lidarData.point_cloud[i + 1] << " " << lidarData.point_cloud[i + 2] << std::endl;
+    // }
+    // ofs.close();    
 }
 
 void getGPSData(msr::airlib::MultirotorRpcLibClient& client) {
@@ -73,11 +98,25 @@ void getGPSData(msr::airlib::MultirotorRpcLibClient& client) {
     << "gps_data.gnss.epv \t" << gps_data.gnss.epv << std::endl
     << "gps_data.gnss.velocity \t" << gps_data.gnss.velocity << std::endl
     << "gps_data.gnss.fix_type \t" << gps_data.gnss.fix_type << std::endl;
+
+    // char name[10] = {0};
+    // sprintf(name, "%05d.gps", m_nFrames);
+    // std::ofstream ofs(name);
+    // ofs << gps_data.time_stamp << " " << gps_data.gnss.time_utc << " " << gps_data.gnss.geo_point
+    //     << gps_data.gnss.eph << " " << gps_data.gnss.epv << " " << gps_data.gnss.velocity << " " << gps_data.gnss.fix_type
+    //     << std::endl;
+    // ofs.close();
 }
 
 void getPosition(msr::airlib::MultirotorRpcLibClient& client) {
     auto position = client.getMultirotorState().getPosition();
     std::cout << "get position " << position.x() << " " << position.y() << " " << position.z() << std::endl;
+
+    // char name[10] = {0};
+    // sprintf(name, "%05d.pos", m_nFrames);
+    // std::ofstream ofs(name);
+    // ofs << position.x() << " " << position.y() << " " << position.z() << std::endl;
+    // ofs.close();
 }
 
 struct GetDataThread {
@@ -128,15 +167,16 @@ private:
         do {
             switch (mType) {
             case 1:
-                pManager->getImageData();
-                std::this_thread::sleep_for(std::chrono::milliseconds(8));
+                pManager->getImageData("front_center");
+                std::this_thread::sleep_for(std::chrono::milliseconds(70));
                 break;
             case 2:
                 pManager->getLidarData();
-                std::this_thread::sleep_for(std::chrono::milliseconds(15));
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 break;
             default:
                 pManager->getImuData();
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 break;
             }
         } while (exitListener.wait_for(std::chrono::microseconds(1)) == std::future_status::timeout);
@@ -179,34 +219,34 @@ void AirSimManager::run() {
     for (auto& t : getDataThreads) {
         t.run();
     }
+
     float velocity = .5f;
     auto rotate = [&](float theta = 30, bool crosswise = true) {
         //client.rotateToYawAsync(crosswise ? 90 : -90)->waitOnLastTask();
         client.rotateToYawAsync(crosswise ? theta : -theta)->waitOnLastTask();
-        std::this_thread::sleep_for(std::chrono::seconds(5));
         };
 
-    std::this_thread::sleep_for(std::chrono::seconds(10));
     try {
         Vector3r origin = client.getMultirotorState().getPosition();
-        float height = origin.z();
-        vector<Vector3r> path = {
-            Vector3r(0, 0, height)
-        };
+        std::cout << "current position " << origin.x() << " " << origin.y() << " " << origin.z() << std::endl;
+        float height = origin.z() - 5;
 
-        float x = 0, y = 0;
+        float x = -5, y = -8;
         float xn = 0, yn = 0;
-        float xc = 5, yc = 5;
+        float xc = -5, yc = -8;
 
-        rotate(90);
-        int count = 0;
-        float step_angle = 15.f;
-        while (count < std::ceil(360 / step_angle)) {
+        float step_angle = 10.f;
+        float yaw = 0;
+        while (yaw < 360.f) {
+            yaw += step_angle;
             acrosswise(x, y, xc, yc, xn, yn, step_angle);
+            x = xn;
+            y = yn;
             client.moveToPositionAsync(xn, yn, height, velocity, Utils::max<float>(), DrivetrainType::ForwardOnly, YawMode(false, 0))->waitOnLastTask();
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-            rotate(10);
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            
+            rotate(yaw, false);
+
+            // std::cout << "frame " << m_nFrames << " " << xn << " " << yn << std::endl;
         }
 
         for (auto& t : getDataThreads) {

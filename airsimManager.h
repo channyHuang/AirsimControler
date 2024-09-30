@@ -19,10 +19,10 @@ using namespace msr::airlib;
 class AirSimManager {
 public:
 	static std::shared_ptr<AirSimManager> getInstance() {
-		if (instance == nullptr) {
-			instance = std::make_shared<AirSimManager>();
+		if (m_pInstance == nullptr) {
+			m_pInstance = std::make_shared<AirSimManager>();
 		}
-		return instance;
+		return m_pInstance;
 	}
 	AirSimManager() {}
 	~AirSimManager() {}
@@ -36,10 +36,12 @@ public:
 	void test();
 
 	void getImuData();
-	void getImageData(const std::string& camera_name = "front_center", const std::string& vehicle_name = "UAV201");
+	void getImageData(const std::string& camera_name = "front_center", const std::string& vehicle_name = "SimpleFlight");
 	void getLidarData(const std::string& lidar_name = "MyLidar1", const std::string& vehicle_name = "UAV201");
-private:
-	static std::shared_ptr<AirSimManager> instance;
+
+protected:
+	static std::shared_ptr<AirSimManager> m_pInstance;
 
 	msr::airlib::MultirotorRpcLibClient client;	
+	int m_nFrames = 0;
 };

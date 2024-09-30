@@ -10,8 +10,8 @@
 namespace sensor_msgs {
 	struct Stamp {
 		double stamp = 0.0;
-		int sec = 0;
-		int nsec = 0;
+		uint64_t sec = 0;
+		uint64_t nsec = 0;
 
 		Stamp() {}
 		Stamp(double _stamp) : stamp(_stamp) {}

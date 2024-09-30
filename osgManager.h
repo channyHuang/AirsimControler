@@ -15,32 +15,33 @@
 
 #include "messageStruct.h"
 
-class OsgManager
+#include "commonOsg/osgManagerBase.h"
+
+class OsgManager : public OsgManagerBase
 {
 public:
 	static OsgManager* getInstance() {
-		if (instance == nullptr) {
-			instance = new OsgManager();
+		if (m_pInstance == nullptr) {
+			m_pInstance = new OsgManager();
 		}
-		return instance;
+		return m_pInstance;
 	}
 
-	~OsgManager();
-
-	void setViewer(osgViewer::Viewer& viewer);
-	void switchScene();
+	virtual ~OsgManager();
 
 	void run();
 	void getPosition();
 	void test();
 
 	void getPoints(const sensor_msgs::PointCloud2::ConstPtr& msg_in);
-private:
+
+protected:
+	static OsgManager* m_pInstance;
+
+protected:
 	OsgManager();
 	
 private:
-	static OsgManager* instance;
-	int sceneMaxIdx = 0, sceneIdx = 0;
 	osg::ref_ptr<osg::Group> root = nullptr;
 	osg::ref_ptr<osg::Group> rootWireTerrain = nullptr;
 	osg::ref_ptr<osg::Group> sunLight = nullptr;
