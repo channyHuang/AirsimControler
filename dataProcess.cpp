@@ -136,6 +136,7 @@ void DataProcess::imu_cbk(const sensor_msgs::Imu::ConstPtr &msg) {
     // calc current vel/rot/pos
     if (!if_first_imu) {
         if_first_imu = 0;
+        last_timestamp_imu = timestamp;
         return;
     }
     dt = timestamp - last_timestamp_imu;
@@ -174,7 +175,7 @@ void DataProcess::imu_cbk(const sensor_msgs::Imu::ConstPtr &msg) {
         Eigen::Vector3d( COV_BIAS_ACC_NOISE_DIAG, COV_BIAS_ACC_NOISE_DIAG, COV_BIAS_ACC_NOISE_DIAG ) * dt * dt; // bias acc covariance
 
     R_imu = R_imu * Exp_f;
-    acc_imu = R_imu * acc_avr ;//- gravity;
+    acc_imu = R_imu * acc_avr - gravity;
     pos_imu = pos_imu + vel_imu * dt + 0.5 * acc_imu * dt * dt;
     vel_imu = vel_imu + acc_imu * dt;
     //angvel_last = angvel_avr;

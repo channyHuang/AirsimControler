@@ -74,7 +74,10 @@ void OsgManager::updatePosition(double x, double y, double z, double w, double t
 		varray->push_back(osg::Vec3(tx, ty, tz));
 
 		pathGeom->setVertexArray(varray);
+		pathGeom->removePrimitiveSet(0, pathGeom->getNumPrimitiveSets());
+		
 		pathGeom->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINE_STRIP, 0, varray->size()));
+		
 		pathGeom->dirtyBound();
 		pathGeom->dirtyGLObjects();
 	}

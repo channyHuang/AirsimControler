@@ -7,6 +7,8 @@ GLuint textureID;
 #include "commonOsg/commonOsg.h"
 
 #include "nativefiledialog/nfd.h"
+#include "parseSim.h"
+#include "dataProcess.h"
 
 void pickCbFunc(const osg::Vec3& vPos, void* pUser) {
 	// do someing here
@@ -63,15 +65,25 @@ void ImguiMainPage::drawUi() {
     {
         if (ImGui::BeginTabItem("Drone"))
         {
-            if (ImGui::Button("move")) {
+            if (ImGui::Button("move to control airsim")) {
                 std::thread runThread([]() { OsgManager::getInstance()->run(); });
                 runThread.detach();
             }
             if (ImGui::Button("get position")) {
                 OsgManager::getInstance()->getPosition();
             }
-            if (ImGui::Button("test")) {
+            if (ImGui::Button("test airsim")) {
                 OsgManager::getInstance()->test();
+            }
+            if (ImGui::Button("parse airsim data")) {
+                std::thread runThread([]() {
+                    DataProcess process;
+                    ParseSim::getInstance()->notifyImu.connect(&process, &DataProcess::imu_cbk);
+
+                    ParseSim::getInstance()->parse("./../simdata.bin");
+                    std::cout << "parse end..." << std::endl;
+                });
+                runThread.detach();
             }
             ImGui::EndTabItem();
         }
