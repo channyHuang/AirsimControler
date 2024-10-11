@@ -15,6 +15,9 @@ add_subdirectory(${OUTER_DIR}/imgui imgui)
 add_subdirectory(${OUTER_DIR}/commonOsg commonOsg)
 add_subdirectory(${OUTER_DIR}/nativefiledialog nativefiledialog)
 
+# 滤波
+add_subdirectory(filters)
+
 FILE(GLOB FILES_C "*.cpp")
 FILE(GLOB FILES_H "*.h" "*.inl")
 
@@ -35,6 +38,7 @@ include_directories(${PROJECT_NAME}
     ${AIRSIM_DIR}/AirLib/deps/rpclib/include
     ./
     ${OUTER_DIR}
+    ./filters/include
 	)
 	
 link_directories(${PROJECT_NAME}
@@ -63,6 +67,8 @@ target_link_libraries(${PROJECT_NAME}
 	imgui
     commonOsg
     nativefiledialog
+# 滤波
+    imuFilters
 )
 
 target_link_libraries(${PROJECT_NAME} 

@@ -9,6 +9,7 @@ GLuint textureID;
 #include "nativefiledialog/nfd.h"
 #include "parseSim.h"
 #include "dataProcess.h"
+#include "filters/imu_vo_ukf.h"
 
 void pickCbFunc(const osg::Vec3& vPos, void* pUser) {
 	// do someing here
@@ -79,6 +80,16 @@ void ImguiMainPage::drawUi() {
                 std::thread runThread([]() {
                     DataProcess process;
                     ParseSim::getInstance()->notifyImu.connect(&process, &DataProcess::imu_cbk);
+
+                    ParseSim::getInstance()->parse("./../simdata.bin");
+                    std::cout << "parse end..." << std::endl;
+                });
+                runThread.detach();
+            }
+            if (ImGui::Button("parse airsim data and ukf")) {
+                std::thread runThread([]() {
+                    cg::UKFFusionNode node;
+                    ParseSim::getInstance()->notifyImu.connect(&node, &cg::UKFFusionNode::imu_callback);
 
                     ParseSim::getInstance()->parse("./../simdata.bin");
                     std::cout << "parse end..." << std::endl;
