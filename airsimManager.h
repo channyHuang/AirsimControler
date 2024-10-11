@@ -16,6 +16,8 @@ using namespace msr::airlib;
 #include "signalSlots.h"
 #include "messageStruct.h"
 
+#include <mutex>
+
 class AirSimManager {
 public:
 	static std::shared_ptr<AirSimManager> getInstance() {
@@ -36,11 +38,17 @@ public:
 	void test();
 
 	void getImuData();
-	void getImageData(const std::string& camera_name = "front_center", const std::string& vehicle_name = "SimpleFlight");
+	void getImageData(const std::string& camera_name = "front_center", const std::string& vehicle_name = "UAV201");
 	void getLidarData(const std::string& lidar_name = "MyLidar1", const std::string& vehicle_name = "UAV201");
+	
+	void writeToFile();
 
 protected:
 	static std::shared_ptr<AirSimManager> m_pInstance;
+	std::mutex m_writeMutex;
+	std::queue<std::pair<uint32_t, char*>> m_qBuffers;
+	std::string m_sOutFile = "./simdata.bin";
+
 
 	msr::airlib::MultirotorRpcLibClient client;	
 	int m_nFrames = 0;

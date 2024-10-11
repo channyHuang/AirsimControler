@@ -8,12 +8,12 @@ find_package(OpenSceneGraph REQUIRED osg osgViewer osgUtil osgDB osgGA osgText)
 find_package(glfw3 REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
+#find_package(PCL REQUIRED)
 
 set(OUTER_DIR ${CMAKE_SOURCE_DIR}/../commonClass)
 add_subdirectory(${OUTER_DIR}/imgui imgui)
 add_subdirectory(${OUTER_DIR}/commonOsg commonOsg)
 add_subdirectory(${OUTER_DIR}/nativefiledialog nativefiledialog)
-#find_package(PCL REQUIRED)
 
 FILE(GLOB FILES_C "*.cpp")
 FILE(GLOB FILES_H "*.h" "*.inl")
@@ -72,7 +72,6 @@ target_link_libraries(${PROJECT_NAME}
     AirLib
     MavLinkCom
     rpc
-    glfw
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -83,9 +82,11 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         # stdc++fs
         pthread
         dl
+        glfw
     )
 else()
     target_link_libraries(${PROJECT_NAME}
         opengl32
+        glfw3
     )
 endif()

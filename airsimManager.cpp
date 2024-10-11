@@ -11,6 +11,24 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 std::shared_ptr<AirSimManager> AirSimManager::m_pInstance = nullptr;
+const bool g_bWrite = false;
+#define PI 3.1415926
+
+void AirSimManager::writeToFile() {
+   if (m_qBuffers.empty()) {
+       return;
+   }
+   std::pair<uint32_t, char*> data;
+   {
+       std::lock_guard<std::mutex> locker(m_writeMutex);
+       data = m_qBuffers.front();
+       m_qBuffers.pop();
+   }
+   std::ofstream ofs(m_sOutFile, std::ios::binary | std::ios::app);
+   ofs.write(data.second, data.first);
+   ofs.close();
+   delete[] data.second;
+}
 
 void AirSimManager::getImuData() {
     auto imu_data = client.getImuData();
@@ -25,13 +43,38 @@ void AirSimManager::getImuData() {
     msg->linear_acceleration.y() = imu_data.linear_acceleration[1];
     msg->linear_acceleration.z() = imu_data.linear_acceleration[2];
 
-    notifyImu(msg);
+    if (g_bWrite) {
+        // char name[10] = {0};
+        // sprintf(name, "%llu.%09llu.imu", msg->header.stamp.sec, msg->header.stamp.nsec);
+        // std::ofstream ofs(name, std::ios_base::app);
+        // ofs << msg->header.stamp.toSec() << " " << msg->angular_velocity.x() << " " << msg->angular_velocity.y() << " " << msg->angular_velocity.z() << " " << msg->linear_acceleration.x() << " " << msg->linear_acceleration.y() << " " << msg->linear_acceleration.z() << std::endl;
+        // ofs.close();
+        char* buffer = new char[33];
+        char* pBuffer = buffer;
+        *(reinterpret_cast<char*>(pBuffer)) = '0';
+        pBuffer += 1;
+        *(reinterpret_cast<uint64_t*>(pBuffer)) = imu_data.time_stamp;
+        pBuffer += 8;
+        *(reinterpret_cast<float*>(pBuffer)) = imu_data.angular_velocity[0];
+        pBuffer += 4;
+        *(reinterpret_cast<float*>(pBuffer)) = imu_data.angular_velocity[1];
+        pBuffer += 4;
+        *(reinterpret_cast<float*>(pBuffer)) = imu_data.angular_velocity[2];
+        pBuffer += 4;
+        *(reinterpret_cast<float*>(pBuffer)) = imu_data.linear_acceleration[0];
+        pBuffer += 4;
+        *(reinterpret_cast<float*>(pBuffer)) = imu_data.linear_acceleration[1];
+        pBuffer += 4;
+        *(reinterpret_cast<float*>(pBuffer)) = imu_data.linear_acceleration[2];
 
-    // char name[10] = {0};
-    // sprintf(name, "%llu.%09llu.imu", msg->header.stamp.sec, msg->header.stamp.nsec);
-    // std::ofstream ofs(name, std::ios_base::app);
-    // ofs << msg->header.stamp.toSec() << " " << msg->angular_velocity.x() << " " << msg->angular_velocity.y() << " " << msg->angular_velocity.z() << " " << msg->linear_acceleration.x() << " " << msg->linear_acceleration.y() << " " << msg->linear_acceleration.z() << std::endl;
-    // ofs.close();
+        {
+            std::lock_guard<std::mutex> locker(m_writeMutex);
+            m_qBuffers.push(std::make_pair(33, buffer));
+        }
+    } else {
+        notifyImu(msg);
+    }
+
 }
 
 void AirSimManager::getImageData(const std::string &camera_name, const std::string& vehicle_name) {
@@ -54,11 +97,28 @@ void AirSimManager::getImageData(const std::string &camera_name, const std::stri
             msg->header.stamp.nsec = image_info.time_stamp % 1000000000;
             msg->imageView = cv::imdecode(image_info.image_data_uint8, cv::IMREAD_COLOR);
             
-            notifyImage(msg);
+            if (g_bWrite) {
+                // char name[10] = {0};
+                // sprintf(name, "%llu.%09llu.jpg", msg->header.stamp.sec, msg->header.stamp.nsec);
+                // cv::imwrite(name, img);
+                char* buffer = new char[image_info.image_data_uint8.size() * sizeof(uint8_t) + 17];
+                char* pBuffer = buffer;
+                *(reinterpret_cast<char*>(pBuffer)) = '1';
+                pBuffer += 1;
+                *(reinterpret_cast<uint64_t*>(pBuffer)) = image_info.time_stamp;
+                pBuffer += 8;
+                *(reinterpret_cast<uint64_t*>(pBuffer)) = image_info.image_data_uint8.size();
+                pBuffer += 8;
 
-            // char name[10] = {0};
-            // sprintf(name, "%llu.%09llu.jpg", msg->header.stamp.sec, msg->header.stamp.nsec);
-            // cv::imwrite(name, img);
+                memcpy(pBuffer, image_info.image_data_uint8.data(), image_info.image_data_uint8.size() * sizeof(uint8_t));
+
+                {
+                    std::lock_guard<std::mutex> locker(m_writeMutex);
+                    m_qBuffers.push(std::make_pair(image_info.image_data_uint8.size() * sizeof(uint8_t) + 17, buffer));
+                }
+            } else {
+                notifyImage(msg);
+            }
         }
     }
 }
@@ -77,15 +137,34 @@ void AirSimManager::getLidarData(const std::string& lidar_name, const std::strin
        msg->pcl_pc.push_back({ lidarData.point_cloud[i], lidarData.point_cloud[i + 1], lidarData.point_cloud[i + 2] });
     }
 
-    notifyPoints(msg);
-
-    // char name[10] = {0};
-    // sprintf(name, "%llu.%09llu.xyz", msg->header.stamp.sec, msg->header.stamp.nsec);
-    // std::ofstream ofs(name);
-    // for (int i = 0; i < len; i += 3) {
-    //     ofs << lidarData.point_cloud[i] << " " << lidarData.point_cloud[i + 1] << " " << lidarData.point_cloud[i + 2] << std::endl;
-    // }
-    // ofs.close();    
+    if (g_bWrite) {
+        // char name[10] = {0};
+        // sprintf(name, "%llu.%09llu.xyz", msg->header.stamp.sec, msg->header.stamp.nsec);
+        // std::ofstream ofs(name);
+        // for (int i = 0; i < len; i += 3) {
+        //     ofs << lidarData.point_cloud[i] << " " << lidarData.point_cloud[i + 1] << " " << lidarData.point_cloud[i + 2] << std::endl;
+        // }
+        // ofs.close();    
+        size_t blen = (len << 2) + 17;
+        char* buffer = new char[blen];
+        char* pBuffer = buffer;
+        *(reinterpret_cast<char*>(pBuffer)) = '2';
+        pBuffer += 1;
+        *(reinterpret_cast<uint64_t*>(pBuffer)) = lidarData.time_stamp;
+        pBuffer += 8;
+        *(reinterpret_cast<size_t*>(pBuffer)) = len;
+        pBuffer += 8;
+        for (size_t i = 0; i < len; ++i) {
+            *(reinterpret_cast<float*>(pBuffer)) = lidarData.point_cloud[i];
+            pBuffer += 4;
+        }
+        {
+            std::lock_guard<std::mutex> locker(m_writeMutex);
+            m_qBuffers.push(std::make_pair(blen, buffer));
+        }
+    } else {
+        notifyPoints(msg);
+    }
 }
 
 void getGPSData(msr::airlib::MultirotorRpcLibClient& client) {
@@ -166,6 +245,10 @@ private:
     void threadLoop(std::future<void> exitListener) {
         do {
             switch (mType) {
+            case 0:
+                pManager->getImuData();
+                std::this_thread::sleep_for(std::chrono::milliseconds(30)); // 5
+                break;
             case 1:
                 pManager->getImageData("front_center");
                 std::this_thread::sleep_for(std::chrono::milliseconds(70));
@@ -175,32 +258,35 @@ private:
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 break;
             default:
-                pManager->getImuData();
-                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                pManager->writeToFile();
+                std::this_thread::sleep_for(std::chrono::milliseconds(30));
                 break;
             }
         } while (exitListener.wait_for(std::chrono::microseconds(1)) == std::future_status::timeout);
     }
 };
 
-void acrosswiseOrigin(float x, float y, float& nx, float& ny, float theta = 30) {
-    float sintheta = std::sin(theta / 180.0);
-    float costheta = std::cos(theta / 180.0);
-    nx = y * costheta - x * sintheta;
-    ny = x * sintheta + y * costheta;
+void rotateOrigin(float x, float y, float& nx, float& ny, float theta = 30, bool bCrossWise = true) {
+    float sintheta = std::sin(theta * PI / 180.0);
+    float costheta = std::cos(theta * PI / 180.0);
+    if (bCrossWise) {
+        nx =  x * costheta - y * sintheta;
+        ny =  x * sintheta + y * costheta;
+    }
+    else {
+        nx =  x * costheta + y * sintheta;
+        ny = -x * sintheta + y * costheta;
+    }
 }
 
-void acrosswise(float x, float y, float xc, float yc, float& nx, float& ny, float theta = 30) {
-    float sintheta = std::sin(theta / 180.0);
-    float costheta = std::cos(theta / 180.0);
-
+void rotate(float x, float y, float xc, float yc, float& nx, float& ny, float theta = 30, bool bCrossWise = true) {
     float ox = x - xc;
     float oy = y - yc;
-    float nox = oy * costheta - ox * sintheta;
-    float noy = ox * sintheta + oy * costheta;
 
-    nx = nox + xc;
-    ny = noy + yc;
+    rotateOrigin(ox, oy, nx, ny, theta, bCrossWise);
+    
+    nx += xc;
+    ny += yc;
 }
 
 void AirSimManager::run() {
@@ -210,53 +296,47 @@ void AirSimManager::run() {
     client.takeoffAsync()->waitOnLastTask();
     
     std::vector<GetDataThread> getDataThreads;
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i <= 3; ++i) {
         getDataThreads.push_back(GetDataThread(this, i));
     }
 
     std::cout << "run start " << std::endl;
    
+    float velocity = .5f;
+    float x = 5, y = -13;
+    float xn = 0, yn = 0;
+    float xc = 5, yc = -8;
+    Vector3r origin = client.getMultirotorState().getPosition();
+    float height = origin.z() - 5;
+    client.moveToPositionAsync(x, y, height, velocity, Utils::max<float>(), DrivetrainType::ForwardOnly, YawMode(false, 0))->waitOnLastTask();
+
     for (auto& t : getDataThreads) {
         t.run();
     }
 
-    float velocity = .5f;
-    auto rotate = [&](float theta = 30, bool crosswise = true) {
+    auto rotate2Yaw = [&](float theta = 30, bool crosswise = true) {
         //client.rotateToYawAsync(crosswise ? 90 : -90)->waitOnLastTask();
         client.rotateToYawAsync(crosswise ? theta : -theta)->waitOnLastTask();
         };
 
     try {
-        Vector3r origin = client.getMultirotorState().getPosition();
-        std::cout << "current position " << origin.x() << " " << origin.y() << " " << origin.z() << std::endl;
-        float height = origin.z() - 5;
-
-        float x = -5, y = -8;
-        float xn = 0, yn = 0;
-        float xc = -5, yc = -8;
-
         float step_angle = 10.f;
         float yaw = 0;
         while (yaw < 360.f) {
             yaw += step_angle;
-            acrosswise(x, y, xc, yc, xn, yn, step_angle);
+            rotate(x, y, xc, yc, xn, yn, step_angle);
             x = xn;
             y = yn;
             client.moveToPositionAsync(xn, yn, height, velocity, Utils::max<float>(), DrivetrainType::ForwardOnly, YawMode(false, 0))->waitOnLastTask();
-            
-            rotate(yaw, false);
-
-            // std::cout << "frame " << m_nFrames << " " << xn << " " << yn << std::endl;
-        }
-
-        for (auto& t : getDataThreads) {
-            t.stop();
         }
     }
     catch (rpc::rpc_error& e) {
         std::cout << "Exception " << e.get_error().as<std::string>() << std::endl;
     }
 
+    for (auto& t : getDataThreads) {
+        t.stop();
+    }
     for (auto& t : getDataThreads) {
         t.join();
     }

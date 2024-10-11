@@ -17,6 +17,8 @@
 
 #include "commonOsg/osgManagerBase.h"
 
+#include <osg/MatrixTransform>
+
 class OsgManager : public OsgManagerBase
 {
 public:
@@ -35,6 +37,8 @@ public:
 
 	void getPoints(const sensor_msgs::PointCloud2::ConstPtr& msg_in);
 
+	void updatePosition(double x, double y, double z, double w, double tx, double ty, double tz);
+
 protected:
 	static OsgManager* m_pInstance;
 
@@ -44,8 +48,13 @@ protected:
 private:
 	osg::ref_ptr<osg::Group> root = nullptr;
 	osg::ref_ptr<osg::Group> rootWireTerrain = nullptr;
+	osg::ref_ptr<osg::Geometry> pathGeom = nullptr;
 	osg::ref_ptr<osg::Group> sunLight = nullptr;
 	osg::ref_ptr<osgViewer::Viewer> pviewer = nullptr;
 	osg::ref_ptr<osg::Switch> sceneSwitch;
+
+	osg::ref_ptr<osg::MatrixTransform> localAxisNode = nullptr;
+	osg::Matrix localAxisMatrix;
+	std::mutex notifyMutex;
 };
 
